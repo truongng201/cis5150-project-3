@@ -1,41 +1,45 @@
+"""Convert clamped uniform cubic de Boor points to Bezier segments."""
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Iterable
 from drawbezier_dc import drawbezier_dc
 
-"""
-To display a cubic B-sline given by de Boor control points
-d_0, ..., d_N  
 
-Input points: left click for the d's then press enter (or return, or right click)  
+def bspline2b(dx, dy, N: int, nn: int, drawb: bool):
+    """N is the last array index; there are N - 2 Bezier segments.
 
-Performs a loop from 1 to N - 2 to compute the Bezier
-points using de Casteljau subdivision
-nn is the subdivision level
-
-This version also outputs the x-coodinates and the y-coordinates
-of all the control points of the Bezier segments stored in
-Bx(N-2,4) and By(N-2,4)
-"""
-
-def bspline2b(dx: np.ndarray|list[float], dy: np.ndarray|list[float], N: int, nn: int, drawb: bool) -> tuple[np.ndarray, np.ndarray]:
-    # Works if N >= 4
-
-    Bx = np.zeros(0)
-    By = np.zeros(0)
-    # === COMPUTE Bx AND By HERE ===
-    raise Exception("Implement me")
-
-    # nn is the subdivision level
+    Array index j stores mathematical point d_{j-1}. Each output row
+    contains four Bezier control coordinates.
+    """
+    dx = np.asarray(dx, dtype=float).reshape(-1)
+    dy = np.asarray(dy, dtype=float).reshape(-1)
+    if N < 4 or len(dx) != N + 1 or len(dy) != N + 1:
+        raise ValueError('Expected N >= 4 and N + 1 de Boor points')
+    if not np.isfinite(dx).all() or not np.isfinite(dy).all():
+        raise ValueError('Control points must be finite')
+    d = np.column_stack((dx, dy))
+    count = N - 2
+    control = np.empty((count, 4, 2))
+    control[0, 1] = d[1]
+    control[0, 2] = (d[1] + d[2]) / 2
+    for i in range(1, count - 1):
+        control[i, 1] = (2 * d[i + 1] + d[i + 2]) / 3
+        control[i, 2] = (d[i + 1] + 2 * d[i + 2]) / 3
+    control[-1, 1] = (d[-3] + d[-2]) / 2
+    control[-1, 2] = d[-2]
+    control[0, 0] = d[0]
+    control[-1, 3] = d[-1]
+    # The join bisects adjacent handles for matching first derivatives.
+    joins = (control[:-1, 2] + control[1:, 1]) / 2
+    control[:-1, 3] = joins
+    control[1:, 0] = joins
+    Bx, By = control[:, :, 0], control[:, :, 1]
     plt.figure()
-    dim_data = 2
-    B = np.zeros((dim_data, 4))
-    plt.plot(dx, dy, 'or-')
-    plt.ion()
-    for i in range(N-2):
-        B[0, :] = Bx[i,:]
-        B[1, :] = By[i,:]
-        drawbezier_dc(B, nn, drawb)
-    plt.ioff()
-
-    return (Bx, By)
+    plt.plot(dx, dy, 'or--', linewidth=0.7, markersize=4,
+             label='de Boor control polygon')
+    for segment in control:
+        drawbezier_dc(segment.T, nn, drawb)
+    plt.axis('equal')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.grid(True, alpha=0.25)
+    return Bx, By

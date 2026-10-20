@@ -1,38 +1,39 @@
+"""Natural C2 cubic interpolation with unit parameter spacing."""
 import numpy as np
 import matplotlib.pyplot as plt
 from bspline2b import bspline2b
 
-def interpatxy(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+
+def interpatxy(x: np.ndarray, y: np.ndarray):
+    """Return dx, dy (N+3 entries), Bx, By (N by 4), and plot.
+
+    Accept flat vectors or column vectors. De Boor arrays store
+    d_{-1}, d_0, ..., d_{N+1} in that order.
     """
-    This version uses the natural end condition
-    Uses Matlab \ to solve linear systems
-    Input points: two column vectors of x and y coordinates of dim N+1
-    
-    This version uses x_0, x_1, ..., x_{N-1}, x_N to compute the Bezier
-    points and the subdivision version of the de Casteljau algorithm
-    to plot the Bezier segments (bspline2b and drawbezier_dc)
-    
-    This version outputs the x and y coordinates dx and dy of the de Boor control
-    points d_{-1}, d_0, d_1, ..., d_{N+1} as column vectors
-    and the x and y coordinates of the Bezier control polygons
-    Bx and By
-    """
-
-    dx: np.ndarray = np.zeros(0)
-    dy: np.ndarray = np.zeros(0)
-    Bx: np.ndarray = np.zeros(0)
-    By: np.ndarray = np.zeros(0)
-    # === Compute dx, dy, Bx, By here === #
-    raise Exception("Implement me")
-
-    # Plots the spline
-    Nx = len(dx)-1
-    print(f"Nx = {Nx}")
-    nn = 6 # Subdivision level
-    drawb = True
-    Bx, By = bspline2b(dx,dy,Nx,nn,drawb) # Copy your version of bspline2b into bspline2b.py
-    plt.ion()
-    plt.plot(x, y, 'b+')
-    plt.ioff()
-
-    return (dx, dy, Bx, By)
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    if any(a.ndim != 1 and not (a.ndim == 2 and 1 in a.shape)
+           for a in (x, y)):
+        raise ValueError('x and y must be coordinate vectors')
+    x, y = x.reshape(-1), y.reshape(-1)
+    if len(x) != len(y) or len(x) < 3:
+        raise ValueError('Provide matching x and y vectors with at least 3 points')
+    if not np.isfinite(x).all() or not np.isfinite(y).all():
+        raise ValueError('Coordinates must be finite')
+    points = np.column_stack((x, y))
+    N = len(x) - 1
+    A = 4 * np.eye(N - 1)
+    A += np.eye(N - 1, k=1) + np.eye(N - 1, k=-1)
+    rhs = 6 * points[1:-1]
+    # For N=2, both endpoint corrections modify the same row.
+    rhs[0] -= points[0]
+    rhs[-1] -= points[-1]
+    inner = np.linalg.solve(A, rhs)
+    d0 = (2 * points[0] + inner[0]) / 3
+    dN = (inner[-1] + 2 * points[-1]) / 3
+    d = np.vstack((points[0], d0, inner, dN, points[-1]))
+    dx, dy = d[:, 0], d[:, 1]
+    Bx, By = bspline2b(dx, dy, len(dx) - 1, 6, True)
+    plt.plot(x, y, 'b+', markersize=9, label='Interpolation data')
+    plt.legend()
+    return dx, dy, Bx, By

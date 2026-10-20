@@ -8,9 +8,11 @@ middle, right or return to end input
 """
 def get_points() -> tuple[np.ndarray, np.ndarray]:
     plt.cla()
-    plt.ion()
+    plt.title('Click at least 3 points, then press Enter')
     plt.axis([0, 10, 0, 10])
-    points = plt.ginput(-1, show_clicks=True)
+    points = plt.ginput(-1, timeout=0, show_clicks=True)
     plt.ioff()
+    if len(points) < 3:
+        raise ValueError('Select at least 3 points before finishing')
     x, y = zip(*points)
     return np.array(x), np.array(y)
